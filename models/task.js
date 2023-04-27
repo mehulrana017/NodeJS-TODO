@@ -1,19 +1,21 @@
 import mongoose from "mongoose";
 
 const schema = mongoose.Schema({
-  name: {
+  title: {
     type: String,
-    unique: true,
     required: true,
   },
-  email: {
+  description: {
     type: String,
     unique: true,
-    required: true,
   },
-  password: {
-    type: String,
-    select: false,
+  isCompleted: {
+    type: Boolean,
+    default: false,
+  },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
     required: true,
   },
   createdAt: {
