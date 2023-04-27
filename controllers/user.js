@@ -1,52 +1,46 @@
 import { User } from "../models/user.js";
 import bcrypt from "bcrypt";
-import { setCookie } from "../routes/utils/features.js";
+import { setCookie } from "../utils/features.js";
+import ErrorHandler from "../middlewares/error.js";
 
-export const register = async (req, res) => {
-  const { name, email, password } = req.body;
+export const register = async (req, res, next) => {
+  try {
+    const { name, email, password } = req.body;
 
-  let user = await User.findOne({ email });
+    let user = await User.findOne({ email });
+    if (user) return next(new ErrorHandler("User Already Exist", 404));
 
-  if (user) {
-    return res.status(404).json({
-      success: false,
-      message: "User Already Exist",
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
     });
+
+    setCookie(user, res, "Registerd Successfully");
+  } catch (error) {
+    next(error);
   }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  user = await User.create({
-    name,
-    email,
-    password: hashedPassword,
-  });
-
-  setCookie(user, res, "Registerd Successfully");
 };
 
 export const login = async (req, res, next) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const user = await User.findOne({ email }).select("+password");
+    const user = await User.findOne({ email }).select("+password");
 
-  if (!user) {
-    res.status(404).json({
-      success: false,
-      message: "Invalid Email or Password",
-    });
+    if (!user) return next(new ErrorHandler("Invalid Email or Password", 404));
+
+    const isPassword = await bcrypt.compare(password, user.password);
+
+    if (!isPassword)
+      return next(new ErrorHandler("Invalid Email or Password", 404));
+
+    setCookie(user, res, `Welcome back, ${user.name}`, 200);
+  } catch (error) {
+    next(error);
   }
-
-  const isPassword = await bcrypt.compare(password, user.password);
-
-  if (!isPassword) {
-    return res.status(404).json({
-      success: false,
-      message: "Invalid Email or Password",
-    });
-  }
-
-  setCookie(user, res, `Welcome back, ${user.name}`, 200);
 };
 
 export const getMyProfile = (req, res) => {
@@ -61,6 +55,8 @@ export const logout = async (req, res) => {
     .status(200)
     .cookie("token", null, {
       maxAge: 0,
+      sameSite: process.env.NODE_ENV === "Development" ? "lax" : "none",
+      secure: process.env.NODE_ENV === "Development" ? false : true,
     })
     .json({
       success: true,
